@@ -45,7 +45,7 @@ if __name__ == '__main__':
     max_workers = 30  # Adjust this based on your CPU and connection
 
     # Start group finder in background threads
-    start_groupfinder(webhook_url, max_workers)
+    start_group_finder(webhook_url, max_workers)
 
     # Start Flask app (status page)
     app.run(host="0.0.0.0", port=8080, debug=False)
