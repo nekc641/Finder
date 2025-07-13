@@ -2,7 +2,7 @@ from flask import Flask
 import os
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
-from config import get_webhook_url
+from config import get_webhooks
 from group_finder import groupfinder
 
 app = Flask(__name__)
