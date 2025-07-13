@@ -17,7 +17,7 @@ async def groupfinder(webhook_url):
         return requests.get(url, timeout=1)
 
     while True:
-        group_id = random.randint(1000000, 9999999)
+        group_id = random.randint(10000000, 99999999)
         try:
             r = make_request(f"https://www.roblox.com/groups/group.aspx?gid={group_id}")
             r.raise_for_status()
