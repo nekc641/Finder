@@ -35,7 +35,7 @@ if __name__ == '__main__':
     """)
 
     hook = get_webhook_url()
-    max_workers = 10  # Adjust the number of workers based on your system's capabilities
+    max_workers = 30  # Adjust the number of workers based on your system's capabilities
     start_groupfinder(hook, max_workers)
 
     app.run(host="0.0.0.0", debug=True, port=8080)
