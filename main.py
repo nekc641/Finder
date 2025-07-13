@@ -42,7 +42,7 @@ if __name__ == '__main__':
 
     # Load webhook and start thread workers
     webhook_url = get_webhook_url()
-    max_workers = 30  # Adjust this based on your CPU and connection
+    max_workers = 3  # Adjust this based on your CPU and connection
 
     # Start group finder in background threads
     start_group_finder(webhook_url, max_workers)
