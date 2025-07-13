@@ -1,60 +1,64 @@
-import requests
 import random
-import discord
 import asyncio
-from discord import Embed
+from discord import Embed, Webhook
 from colorama import Fore, Style
 import aiohttp
-from retrying import retry
-from dotenv import load_dotenv
-import os
-
-load_dotenv()
+from config import get_webhook_url  # Your original config.py
 
 async def groupfinder(webhook_url):
-    @retry(stop_max_attempt_number=1, wait_fixed=1000)
-    def make_request(url):
-        return requests.get(url, timeout=1)
+    async with aiohttp.ClientSession() as session:
+        while True:
+            group_id = random.randint(10000000, 99999999)
 
-    while True:
-        group_id = random.randint(10000000, 99999999)
-        try:
-            r = make_request(f"https://www.roblox.com/groups/group.aspx?gid={group_id}")
-            r.raise_for_status()
+            try:
+                # Fetch group data from Roblox API
+                async with session.get(f"https://groups.roblox.com/v1/groups/{group_id}", timeout=5) as response:
+                    if response.status == 404:
+                        print(f"{Fore.YELLOW}[-] Group does not exist: {group_id}{Style.RESET_ALL}")
+                        await asyncio.sleep(1)
+                        continue
 
-            if 'owned' not in r.text:
-                re = make_request(f"https://groups.roblox.com/v1/groups/{group_id}")
-                re.raise_for_status()
+                    data = await response.json()
 
-                if 'isLocked' not in re.text and 'owner' in re.text:
-                    if re.json()['publicEntryAllowed'] and re.json()['owner'] is None:
-                        embed = Embed(
-                            title="Group Found!",
-                            description=f"[Click here to view the group](https://www.roblox.com/groups/group.aspx?gid={group_id})",
-                            color=discord.Colour.green()
-                        )
-                        embed.set_footer(text="RoFinder | By: RXNationGaming")
+                    # Skip locked groups
+                    if data.get('isLocked'):
+                        print(f"{Fore.RED}[-] Group Locked: {group_id}{Style.RESET_ALL}")
+                        await asyncio.sleep(1)
+                        continue
 
-                        async with aiohttp.ClientSession() as session:
-                            webhook = discord.Webhook.from_url(webhook_url, adapter=discord.AsyncWebhookAdapter(session))
-                            await webhook.send(embed=embed)
+                    # Skip owned groups
+                    if data.get('owner') is not None:
+                        print(f"{Fore.YELLOW}[-] Group Owned: {group_id}{Style.RESET_ALL}")
+                        await asyncio.sleep(1)
+                        continue
 
-                        print(f"{Fore.GREEN}[+] Hit: {group_id}{Style.RESET_ALL}")
-                    else:
-                        print(f"{Fore.RED}[-] No Entry Allowed: {group_id}{Style.RESET_ALL}")
-                else:
-                    print(f"{Fore.RED}[-] Group Locked: {group_id}{Style.RESET_ALL}")
-            else:
-                print(f"{Fore.YELLOW}[-] Group Already Owned: {group_id}{Style.RESET_ALL}")
+                    # Skip groups that don't allow public entry
+                    if not data.get('publicEntryAllowed'):
+                        print(f"{Fore.RED}[-] Public Entry Not Allowed: {group_id}{Style.RESET_ALL}")
+                        await asyncio.sleep(1)
+                        continue
 
-        except requests.exceptions.RequestException as e:
-            print(f"{Fore.RED}Error making request: {e}{Style.RESET_ALL}")
+                    # Valid group found
+                    embed = Embed(
+                        title="Unclaimed Group Found!",
+                        description=f"[Click here to view the group](https://www.roblox.com/communities/{group_id})",
+                        color=0x00ff00
+                    )
+                    embed.set_footer(text="RoFinder | By: RXNationGaming")
 
-        await asyncio.sleep(1)
+                    webhook = Webhook.from_url(webhook_url, session=session)
+                    await webhook.send(embed=embed)
+
+                    print(f"{Fore.GREEN}[+] HIT: Group ID {group_id}{Style.RESET_ALL}")
+
+            except asyncio.TimeoutError:
+                print(f"{Fore.RED}Timeout while checking group {group_id}{Style.RESET_ALL}")
+            except Exception as e:
+                print(f"{Fore.RED}Error: {e}{Style.RESET_ALL}")
+
+            await asyncio.sleep(1)  # Sleep to avoid rate limits
 
 if __name__ == '__main__':
-    webhook_url = os.getenv('DISCORD_WEBHOOK')
-    if webhook_url is None:
-        print("Please set DISCORD_WEBHOOK in your .env file.")
-    else:
+    webhook_url = get_webhook_url()
+    if webhook_url:
         asyncio.run(groupfinder(webhook_url))
