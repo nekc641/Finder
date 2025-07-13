@@ -3,14 +3,26 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-def get_webhook_url():
-    webhook_url = os.getenv("DISCORD_WEBHOOK")
+def get_webhooks():
+    hit = os.getenv("WEBHOOK_HIT")
+    owned = os.getenv("WEBHOOK_OWNED")
+    locked = os.getenv("WEBHOOK_LOCKED")
 
-    if not webhook_url:
-        print("Warning: Discord webhook URL is not set in the .env file.")
-        webhook_url = input("Please enter your Discord webhook URL manually: ")
+    if not hit or not owned or not locked:
+        print("⚠️ One or more webhooks are missing in .env file.")
+        if not hit:
+            hit = input("Enter HIT webhook: ")
+        if not owned:
+            owned = input("Enter OWNED webhook: ")
+        if not locked:
+            locked = input("Enter LOCKED webhook: ")
 
-    return webhook_url
+    return {
+        "hit": hit,
+        "owned": owned,
+        "locked": locked
+    }
 
 def get_thread_count():
     return 99999999999999999
+    
