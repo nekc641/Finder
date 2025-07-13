@@ -3,11 +3,11 @@ import os
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from config import get_webhook_url
-from groupfinder import groupfinder
+from group_finder import group_finder
 
 app = Flask(__name__)
 
-def start_groupfinder(webhook_url, max_workers):
+def start_group_finder(webhook_url, max_workers):
     # Each thread runs its own event loop
     def runner():
         loop = asyncio.new_event_loop()
