@@ -10,7 +10,7 @@ async def groupfinder():
 
     async with aiohttp.ClientSession() as session:
         while True:
-            group_id = random.randint(10000000, 99999999)
+            group_id = random.randint(1000000, 99999999)
 
             try:
                 async with session.get(f"https://groups.roblox.com/v1/groups/{group_id}", timeout=5) as response:
@@ -21,6 +21,7 @@ async def groupfinder():
 
                     data = await response.json()
 
+                    # 🔒 LOCKED
                     if data.get('isLocked'):
                         print(f"{Fore.RED}[-] Group Locked: {group_id}{Style.RESET_ALL}")
                         await asyncio.sleep(1)
@@ -29,41 +30,42 @@ async def groupfinder():
                     # 🟡 OWNED
                     if data.get('owner') is not None:
                         print(f"{Fore.YELLOW}[-] Group Owned: {group_id}{Style.RESET_ALL}")
-
                         embed = Embed(
-                            title="Group Already Owned",
+                            title="🟡 Group Already Owned",
                             description=f"[View Group](https://www.roblox.com/communities/{group_id})",
                             color=0xffcc00
                         )
-                        embed.set_footer(text="RoFinder | By: RXNationGaming")
+                        embed.add_field(name="Group ID", value=str(group_id), inline=True)
+                        embed.add_field(name="Status", value="❌ Claimed", inline=True)
                         webhook = Webhook.from_url(webhooks["owned"], session=session)
                         await webhook.send(embed=embed)
-                        await asyncio.sleep(random.uniform(3.5, 6.5))
+                        await asyncio.sleep(random.uniform(2.0, 3.2))
                         continue
 
-                    # 🔒 UNCLAIMED BUT LOCKED
+                    # 🔒 UNCLAIMED BUT NOT JOINABLE
                     if not data.get('publicEntryAllowed'):
                         print(f"{Fore.MAGENTA}[!] Unclaimed but No Public Entry: {group_id}{Style.RESET_ALL}")
                         embed = Embed(
-                            title="Unclaimed Group (Private Entry)",
+                            title="🔒 Unclaimed Group (Locked)",
                             description=f"[View Group](https://www.roblox.com/communities/{group_id})",
                             color=0xff00ff
                         )
-                        embed.add_field(name="Status", value="Unclaimed but public joining is disabled.")
-                        embed.set_footer(text="RoFinder | By: RXNationGaming")
+                        embed.add_field(name="Group ID", value=str(group_id), inline=True)
+                        embed.add_field(name="Status", value="🚫 Public entry disabled", inline=True)
                         webhook = Webhook.from_url(webhooks["locked"], session=session)
                         await webhook.send(embed=embed)
-                        await asyncio.sleep(random.uniform(3.5, 6.5))
+                        await asyncio.sleep(random.uniform(2.0, 3.2))
                         continue
 
-                    # ✅ HIT: UNCLAIMED + JOINABLE
+                    # ✅ HIT (Unclaimed and Joinable)
                     print(f"{Fore.GREEN}[+] HIT: Unclaimed Group ID {group_id}{Style.RESET_ALL}")
                     embed = Embed(
                         title="🔥 Unclaimed Group Found!",
-                        description=f"[Click here to view the group](https://www.roblox.com/communities/{group_id})",
+                        description=f"**[Click to View Group](https://www.roblox.com/communities/{group_id})**",
                         color=0x00ff00
                     )
-                    embed.set_footer(text="RoFinder | By: RXNationGaming")
+                    embed.add_field(name="Group ID", value=str(group_id), inline=True)
+                    embed.add_field(name="Status", value="✅ Joinable", inline=True)
                     webhook = Webhook.from_url(webhooks["hit"], session=session)
                     await webhook.send(embed=embed)
 
@@ -72,10 +74,10 @@ async def groupfinder():
             except Exception as e:
                 print(f"{Fore.RED}Error: {e}{Style.RESET_ALL}")
 
-            delay = random.uniform(3.5, 6.5)
+            delay = random.uniform(2.0, 3.0)
             print(f"{Fore.BLUE}[~] Sleeping for {delay:.2f} seconds{Style.RESET_ALL}")
             await asyncio.sleep(delay)
 
-# For testing outside multithreading
+# Optional standalone test
 if __name__ == '__main__':
     asyncio.run(groupfinder())
