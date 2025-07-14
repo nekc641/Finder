@@ -6,32 +6,28 @@ from colorama import Fore, Style
 import aiohttp
 from config import get_webhooks
 from datetime import datetime
-from telegram import send_summary_to_telegram
-import time
-
-THUMBNAIL_HIT = "https://tr.rbxcdn.com/60bada71ecdd90e1f203ee400037b92d/150/150/Image/Png"
 
 scan_count = 0
 hit_count = 0
 owned_count = 0
 locked_count = 0
 seen_ids = set()
-last_summary_time = time.time()
 
 async def groupfinder():
-    global scan_count, hit_count, owned_count, locked_count, seen_ids, last_summary_time
+    global scan_count, hit_count, owned_count, locked_count, seen_ids
     webhooks = get_webhooks()
-
-    # Ask for summary webhook if not present
-    summary = os.getenv("WEBHOOK_SUMMARY")
-    telegram_enabled = os.getenv("TELEGRAM_BOT_TOKEN") and os.getenv("TELEGRAM_CHAT_ID")
 
     async with aiohttp.ClientSession() as session:
         while True:
-            group_id = random.choice([
-                random.randint(1000000, 5000000),
-                random.randint(10000000, 99999999)
-            ])
+            # Combined intelligent group ID range logic
+            choice = random.randint(1, 100)
+            if choice <= 40:
+                group_id = random.randint(1000000, 4999999)
+            elif choice <= 80:
+                group_id = random.randint(5000000, 9999999)
+            else:
+                group_id = random.randint(10000000, 99999999)
+
             if group_id in seen_ids:
                 print(f"{Fore.CYAN}[=] Duplicate group ID skipped: {group_id}{Style.RESET_ALL}")
                 await asyncio.sleep(0.1)
@@ -40,7 +36,6 @@ async def groupfinder():
 
             scan_count += 1
             start_time = datetime.now()
-            scan_start_time = time.time()
 
             try:
                 async with session.get(f"https://groups.roblox.com/v1/groups/{group_id}", timeout=5) as response:
@@ -62,16 +57,16 @@ async def groupfinder():
                     if len(description) > 200:
                         description = description[:200] + "..."
 
-                    creation_date = "Unknown"
-                    if creation:
-                        try:
-                            creation_date = datetime.fromisoformat(creation.replace("Z", "+00:00")).strftime("%B %d, %Y")
-                        except Exception:
-                            pass
+                    try:
+                        if creation:
+                            creation_date = datetime.strptime(creation, "%Y-%m-%dT%H:%M:%S.%fZ").strftime("%B %d, %Y")
+                        else:
+                            creation_date = "Unknown"
+                    except Exception as e:
+                        print(f"Failed to parse creation date for group {group_id}: {e}")
+                        creation_date = "Unknown"
 
-                    avatar_url = f"https://www.roblox.com/headshot-thumbnail/image?userId={owner_id}&width=150&height=150&format=png" if owner_id else None
-
-                    # UNCLAIMED BUT NOT JOINABLE (Locked)
+                    # LOCKED
                     if owner_data is None and not data.get('publicEntryAllowed'):
                         print(f"{Fore.MAGENTA}[!] Unclaimed but No Public Entry: {group_id}{Style.RESET_ALL}")
                         embed = Embed(
@@ -79,7 +74,6 @@ async def groupfinder():
                             description=f"[View Group]({group_url})\n{description}",
                             color=0x8e44ad
                         )
-                        embed.set_image(url=THUMBNAIL_HIT)
                         embed.add_field(name="Group ID", value=str(group_id), inline=True)
                         embed.add_field(name="Members", value=str(members), inline=True)
                         embed.add_field(name="Created", value=creation_date, inline=True)
@@ -95,15 +89,14 @@ async def groupfinder():
                     # OWNED
                     if owner_data is not None:
                         print(f"{Fore.YELLOW}[-] Group Owned: {group_id}{Style.RESET_ALL}")
+                        avatar_url = f"https://www.roblox.com/headshot-thumbnail/image?userId={owner_id}&width=150&height=150&format=png"
                         embed = Embed(
                             title=f"Owned Group - {name}",
                             description=f"[View Group]({group_url})\n{description}",
                             color=0xf1c40f
                         )
-                        if avatar_url:
-                            embed.set_thumbnail(url=avatar_url)
+                        embed.set_author(name=f"Owner: {owner_username}", icon_url=avatar_url)
                         embed.add_field(name="Group ID", value=str(group_id), inline=True)
-                        embed.add_field(name="Owner", value=owner_username, inline=True)
                         embed.add_field(name="Members", value=str(members), inline=True)
                         embed.add_field(name="Created", value=creation_date, inline=True)
                         embed.add_field(name="Status", value="Claimed", inline=True)
@@ -122,7 +115,6 @@ async def groupfinder():
                         description=f"[Claim This Group Now!]({group_url})\n{description}",
                         color=0x2ecc71
                     )
-                    embed.set_image(url=THUMBNAIL_HIT)
                     embed.add_field(name="Group ID", value=str(group_id), inline=True)
                     embed.add_field(name="Members", value=str(members), inline=True)
                     embed.add_field(name="Created", value=creation_date, inline=True)
@@ -132,13 +124,6 @@ async def groupfinder():
                     webhook = Webhook.from_url(webhooks["hit"], session=session)
                     await webhook.send(content="@here", embed=embed)
                     hit_count += 1
-
-                    # Summary every 5 scans
-                    if scan_count % 5 == 0:
-                        scan_time = time.time() - scan_start_time
-                        scan_speed = 1 / scan_time if scan_time > 0 else 0
-                        await send_summary_to_telegram("✅ This is a Telegram test message from groupfinder.")
-
 
             except asyncio.TimeoutError:
                 print(f"{Fore.RED}Timeout while checking group {group_id}{Style.RESET_ALL}")
