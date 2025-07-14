@@ -137,7 +137,8 @@ async def groupfinder():
                     if scan_count % 5 == 0:
                         scan_time = time.time() - scan_start_time
                         scan_speed = 1 / scan_time if scan_time > 0 else 0
-                        await send_summary_to_telegram(scan_count, hit_count, locked_count, owned_count, scan_speed)
+                        await send_summary_to_telegram("✅ This is a Telegram test message from groupfinder.")
+
 
             except asyncio.TimeoutError:
                 print(f"{Fore.RED}Timeout while checking group {group_id}{Style.RESET_ALL}")
