@@ -7,7 +7,8 @@ def get_webhooks():
     hit = os.getenv("WEBHOOK_HIT")
     owned = os.getenv("WEBHOOK_OWNED")
     locked = os.getenv("WEBHOOK_LOCKED")
-
+    summary = os.getenv("WEBHOOK_SUMMARY")
+    
     if not hit or not owned or not locked:
         print("⚠️ One or more webhooks are missing in .env file.")
         if not hit:
@@ -20,9 +21,9 @@ def get_webhooks():
     return {
         "hit": hit,
         "owned": owned,
-        "locked": locked
+        "locked": locked,
+        "summary": summary
     }
 
 def get_thread_count():
     return 99999999999999999
-    
