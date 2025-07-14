@@ -95,7 +95,7 @@ async def groupfinder():
                             description=f"[View Group]({group_url})\n{description}",
                             color=0xf1c40f
                         )
-                        embed.set_author(name=f"Owner: {owner_username}", icon_url=avatar_url)
+                        embed.add_field(name="Owner", value=str(owner_username), inline=True)
                         embed.add_field(name="Group ID", value=str(group_id), inline=True)
                         embed.add_field(name="Members", value=str(members), inline=True)
                         embed.add_field(name="Created", value=creation_date, inline=True)
