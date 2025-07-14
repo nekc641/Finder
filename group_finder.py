@@ -5,28 +5,20 @@ from discord import Embed, Webhook
 from colorama import Fore, Style
 import aiohttp
 from config import get_webhooks
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
+import pytz
 
-THUMBNAIL_URL = None  # Custom thumbnail removed, use Roblox group icon instead
+THUMBNAIL_URL = "https://cdn.discordapp.com/attachments/1394012837575131138/1394108844971393055/Untitled6_20250601183907.png"
+ROBLOX_ICON = "https://tr.rbxcdn.com/1e8d47d2a44e1815cf73378fdddf1c3a/150/150/AvatarHeadshot/Png"
+
 scan_count = 0
 hit_count = 0
 owned_count = 0
 locked_count = 0
 seen_ids = set()
 
-# Define Manila timezone
-MANILA_TZ = timezone(timedelta(hours=8))
-
-# Define ID RANGES
-ID_RANGES = [
-    (1000000, 5000000),
-    (5000001, 10000000),
-    (10000001, 99999999)
-]
-current_range_index = 0
-
 async def groupfinder():
-    global scan_count, hit_count, owned_count, locked_count, seen_ids, current_range_index
+    global scan_count, hit_count, owned_count, locked_count, seen_ids
     webhooks = get_webhooks()
 
     summary = os.getenv("WEBHOOK_SUMMARY")
@@ -36,9 +28,11 @@ async def groupfinder():
 
     async with aiohttp.ClientSession() as session:
         while True:
-            start_id, end_id = ID_RANGES[current_range_index]
-            group_id = random.randint(start_id, end_id)
-            current_range_index = (current_range_index + 1) % len(ID_RANGES)
+            group_id = random.choice([
+                random.randint(1000000, 5000000),
+                random.randint(5000001, 10000000),
+                random.randint(10000001, 99999999)
+            ])
 
             if group_id in seen_ids:
                 print(f"{Fore.CYAN}[=] Duplicate group ID skipped: {group_id}{Style.RESET_ALL}")
@@ -72,22 +66,19 @@ async def groupfinder():
                     creation_date = "Unknown"
                     if creation:
                         try:
-                            dt = datetime.fromisoformat(creation.replace("Z", "+00:00"))
-                            creation_date = dt.astimezone(MANILA_TZ).strftime("%B %d, %Y")
+                            dt_utc = datetime.fromisoformat(creation.replace("Z", "+00:00"))
+                            manila_tz = pytz.timezone("Asia/Manila")
+                            creation_date = dt_utc.astimezone(manila_tz).strftime("%B %d, %Y")
                         except Exception:
                             pass
 
-                    icon_url = f"https://www.roblox.com/headshot-thumbnail/image?userId={owner_id}&width=150&height=150&format=png" if owner_id else f"https://thumbnails.roblox.com/v1/groups/icons?groupIds={group_id}&size=150x150&format=Png&isCircular=false"
+                    avatar_url = f"https://www.roblox.com/headshot-thumbnail/image?userId={owner_id}&width=150&height=150&format=png" if owner_id else None
 
-                    # LOCKED
+                    # Locked
                     if owner_data is None and not data.get('publicEntryAllowed'):
                         print(f"{Fore.MAGENTA}[!] Unclaimed but No Public Entry: {group_id}{Style.RESET_ALL}")
-                        embed = Embed(
-                            title=f"Locked Group - {name}",
-                            description=f"[View Group]({group_url})\n{description}",
-                            color=0x8e44ad
-                        )
-                        embed.set_image(url=icon_url)
+                        embed = Embed(title=f"Locked Group - {name}", description=f"[View Group]({group_url})\n{description}", color=0x8e44ad)
+                        embed.set_image(url=THUMBNAIL_URL)
                         embed.add_field(name="Group ID", value=str(group_id), inline=True)
                         embed.add_field(name="Members", value=str(members), inline=True)
                         embed.add_field(name="Created", value=creation_date, inline=True)
@@ -100,16 +91,13 @@ async def groupfinder():
                         await asyncio.sleep(random.uniform(2.0, 3.2))
                         continue
 
-                    # OWNED
+                    # Owned
                     if owner_data is not None:
                         print(f"{Fore.YELLOW}[-] Group Owned: {group_id}{Style.RESET_ALL}")
-                        embed = Embed(
-                            title=f"Owned Group - {name}",
-                            description=f"[View Group]({group_url})\n{description}",
-                            color=0xf1c40f
-                        )
-                        embed.set_author(name=owner_username, icon_url=icon_url)
-                        embed.set_image(url=icon_url)
+                        embed = Embed(title=f"Owned Group - {name}", description=f"[View Group]({group_url})\n{description}", color=0xf1c40f)
+                        if avatar_url:
+                            embed.set_author(name=owner_username, icon_url=avatar_url)
+                        embed.set_image(url=THUMBNAIL_URL)
                         embed.add_field(name="Group ID", value=str(group_id), inline=True)
                         embed.add_field(name="Members", value=str(members), inline=True)
                         embed.add_field(name="Created", value=creation_date, inline=True)
@@ -122,14 +110,10 @@ async def groupfinder():
                         await asyncio.sleep(random.uniform(2.0, 3.2))
                         continue
 
-                    # HIT
+                    # Hit
                     print(f"{Fore.GREEN}[+] HIT: Unclaimed Group ID {group_id}{Style.RESET_ALL}")
-                    embed = Embed(
-                        title=f"HIT: {name}",
-                        description=f"[Claim This Group Now!]({group_url})\n{description}",
-                        color=0x2ecc71
-                    )
-                    embed.set_image(url=icon_url)
+                    embed = Embed(title=f"HIT: {name}", description=f"[Claim This Group Now!]({group_url})\n{description}", color=0x2ecc71)
+                    embed.set_image(url=THUMBNAIL_URL)
                     embed.add_field(name="Group ID", value=str(group_id), inline=True)
                     embed.add_field(name="Members", value=str(members), inline=True)
                     embed.add_field(name="Created", value=creation_date, inline=True)
@@ -140,14 +124,20 @@ async def groupfinder():
                     await webhook.send(content="@here", embed=embed)
                     hit_count += 1
 
+                    # Summary every 20
                     if scan_count % 20 == 0:
-                        summary = Embed(
-                            title="Group Finder Summary",
-                            description=f"Total Scans: {scan_count}\nHits: {hit_count}\nLocked: {locked_count}\nOwned: {owned_count}",
-                            color=0x95a5a6
-                        )
-                        time_now = datetime.now(MANILA_TZ).strftime("%Y-%m-%d %I:%M:%S %p %Z")
-                        summary.set_footer(text=f"Last 20 scan summary at {time_now}")
+                        elapsed = datetime.now() - start_time
+                        scan_speed = 20 / elapsed.total_seconds() if elapsed.total_seconds() > 0 else 0.0
+
+                        now_manila = datetime.utcnow().astimezone(pytz.timezone("Asia/Manila"))
+                        summary = Embed(title="Group Finder Summary", color=0x95a5a6)
+                        summary.set_author(name="ROBLOX", icon_url=ROBLOX_ICON)
+                        summary.add_field(name="Total Scans", value=str(scan_count), inline=True)
+                        summary.add_field(name="Hits", value=str(hit_count), inline=True)
+                        summary.add_field(name="Locked", value=str(locked_count), inline=True)
+                        summary.add_field(name="Owned", value=str(owned_count), inline=True)
+                        summary.add_field(name="Scan Speed", value=f"{scan_speed:.2f}/sec", inline=True)
+                        summary.set_footer(text=f"Last summary sent at {now_manila.strftime('%B %d, %Y - %I:%M:%S %p (%Z)')}")
                         stats_webhook = Webhook.from_url(webhooks["summary"], session=session)
                         await stats_webhook.send(embed=summary)
 
