@@ -15,11 +15,17 @@ owned_count = 0
 locked_count = 0
 seen_ids = set()
 
+# Define strategic ID ranges
+RANGES = [
+    (1000000, 5000000),      # Older deleted/unclaimed groups
+    (10000000, 30000000),    # Middle age groups
+    (90000000, 99999999)     # Newer possibly abandoned groups
+]
+
 async def groupfinder():
     global scan_count, hit_count, owned_count, locked_count, seen_ids
     webhooks = get_webhooks()
 
-    # Ask for summary webhook if not present
     summary = os.getenv("WEBHOOK_SUMMARY")
     if not summary:
         summary = input("Enter SUMMARY webhook: ")
@@ -27,7 +33,9 @@ async def groupfinder():
 
     async with aiohttp.ClientSession() as session:
         while True:
-            group_id = random.randint(1000000, 99999999)
+            selected_range = random.choice(RANGES)
+            group_id = random.randint(*selected_range)
+
             if group_id in seen_ids:
                 print(f"{Fore.CYAN}[=] Duplicate group ID skipped: {group_id}{Style.RESET_ALL}")
                 await asyncio.sleep(0.1)
@@ -95,9 +103,9 @@ async def groupfinder():
                             description=f"[View Group]({group_url})\n{description}",
                             color=0xf1c40f
                         )
-                        embed.set_image(url=avatar_url if avatar_url else THUMBNAIL_URL)
+                        embed.set_image(url=THUMBNAIL_URL)
+                        embed.set_author(name=owner_username, icon_url=avatar_url)
                         embed.add_field(name="Group ID", value=str(group_id), inline=True)
-                        embed.add_field(name="Owner", value=owner_username, inline=True)
                         embed.add_field(name="Members", value=str(members), inline=True)
                         embed.add_field(name="Created", value=creation_date, inline=True)
                         embed.add_field(name="Status", value="Claimed", inline=True)
@@ -128,7 +136,7 @@ async def groupfinder():
                     hit_count += 1
 
                     # Send summary every 100 scans
-                    if scan_count % 100 == 0:
+                    if scan_count % 20 == 0:
                         summary = Embed(
                             title="Group Finder Summary",
                             description=f"Total Scans: {scan_count}\nHits: {hit_count}\nLocked: {locked_count}\nOwned: {owned_count}",
