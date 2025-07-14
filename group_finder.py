@@ -6,29 +6,32 @@ from colorama import Fore, Style
 import aiohttp
 from config import get_webhooks
 from datetime import datetime
-import pytz
-from telegram import send_telegram_summary
+from telegram import send_summary_to_telegram
+import time
 
-THUMBNAIL_URL = "https://www.roblox.com/Thumbs/Avatar.ashx?x=100&y=100&format=png&userid=1"
+THUMBNAIL_HIT = "https://tr.rbxcdn.com/60bada71ecdd90e1f203ee400037b92d/150/150/Image/Png"
 
 scan_count = 0
 hit_count = 0
 owned_count = 0
 locked_count = 0
 seen_ids = set()
+last_summary_time = time.time()
 
 async def groupfinder():
-    global scan_count, hit_count, owned_count, locked_count, seen_ids
+    global scan_count, hit_count, owned_count, locked_count, seen_ids, last_summary_time
     webhooks = get_webhooks()
+
+    # Ask for summary webhook if not present
+    summary = os.getenv("WEBHOOK_SUMMARY")
+    telegram_enabled = os.getenv("TELEGRAM_BOT_TOKEN") and os.getenv("TELEGRAM_CHAT_ID")
 
     async with aiohttp.ClientSession() as session:
         while True:
             group_id = random.choice([
                 random.randint(1000000, 5000000),
-                random.randint(5000001, 10000000),
-                random.randint(10000001, 99999999)
+                random.randint(10000000, 99999999)
             ])
-
             if group_id in seen_ids:
                 print(f"{Fore.CYAN}[=] Duplicate group ID skipped: {group_id}{Style.RESET_ALL}")
                 await asyncio.sleep(0.1)
@@ -37,6 +40,7 @@ async def groupfinder():
 
             scan_count += 1
             start_time = datetime.now()
+            scan_start_time = time.time()
 
             try:
                 async with session.get(f"https://groups.roblox.com/v1/groups/{group_id}", timeout=5) as response:
@@ -61,15 +65,13 @@ async def groupfinder():
                     creation_date = "Unknown"
                     if creation:
                         try:
-                            tz = pytz.timezone("Asia/Manila")
-                            dt = datetime.fromisoformat(creation.replace("Z", "+00:00")).astimezone(tz)
-                            creation_date = dt.strftime("%B %d, %Y")
+                            creation_date = datetime.fromisoformat(creation.replace("Z", "+00:00")).strftime("%B %d, %Y")
                         except Exception:
                             pass
 
                     avatar_url = f"https://www.roblox.com/headshot-thumbnail/image?userId={owner_id}&width=150&height=150&format=png" if owner_id else None
 
-                    # LOCKED
+                    # UNCLAIMED BUT NOT JOINABLE (Locked)
                     if owner_data is None and not data.get('publicEntryAllowed'):
                         print(f"{Fore.MAGENTA}[!] Unclaimed but No Public Entry: {group_id}{Style.RESET_ALL}")
                         embed = Embed(
@@ -77,7 +79,7 @@ async def groupfinder():
                             description=f"[View Group]({group_url})\n{description}",
                             color=0x8e44ad
                         )
-                        embed.set_image(url=THUMBNAIL_URL)
+                        embed.set_image(url=THUMBNAIL_HIT)
                         embed.add_field(name="Group ID", value=str(group_id), inline=True)
                         embed.add_field(name="Members", value=str(members), inline=True)
                         embed.add_field(name="Created", value=creation_date, inline=True)
@@ -99,7 +101,7 @@ async def groupfinder():
                             color=0xf1c40f
                         )
                         if avatar_url:
-                            embed.set_author(name=owner_username, icon_url=avatar_url)
+                            embed.set_thumbnail(url=avatar_url)
                         embed.add_field(name="Group ID", value=str(group_id), inline=True)
                         embed.add_field(name="Owner", value=owner_username, inline=True)
                         embed.add_field(name="Members", value=str(members), inline=True)
@@ -113,14 +115,14 @@ async def groupfinder():
                         await asyncio.sleep(random.uniform(2.0, 3.2))
                         continue
 
-                    # HIT
+                    # HIT (Unclaimed and Joinable)
                     print(f"{Fore.GREEN}[+] HIT: Unclaimed Group ID {group_id}{Style.RESET_ALL}")
                     embed = Embed(
                         title=f"HIT: {name}",
                         description=f"[Claim This Group Now!]({group_url})\n{description}",
                         color=0x2ecc71
                     )
-                    embed.set_image(url="https://www.roblox.com/outfit-thumbnail/image?userOutfitId=1&width=420&height=420&format=png")
+                    embed.set_image(url=THUMBNAIL_HIT)
                     embed.add_field(name="Group ID", value=str(group_id), inline=True)
                     embed.add_field(name="Members", value=str(members), inline=True)
                     embed.add_field(name="Created", value=creation_date, inline=True)
@@ -131,16 +133,11 @@ async def groupfinder():
                     await webhook.send(content="@here", embed=embed)
                     hit_count += 1
 
-                    # Telegram Summary
+                    # Summary every 5 scans
                     if scan_count % 5 == 0:
-                        summary_msg = (
-                            f"📊 *Group Finder Summary*\n"
-                            f"Scans: `{scan_count}`\n"
-                            f"Hits: `{hit_count}`\n"
-                            f"Owned: `{owned_count}`\n"
-                            f"Locked: `{locked_count}`"
-                        )
-                        await send_telegram_summary(summary_msg)
+                        scan_time = time.time() - scan_start_time
+                        scan_speed = 1 / scan_time if scan_time > 0 else 0
+                        await send_summary_to_telegram(scan_count, hit_count, locked_count, owned_count, scan_speed)
 
             except asyncio.TimeoutError:
                 print(f"{Fore.RED}Timeout while checking group {group_id}{Style.RESET_ALL}")
