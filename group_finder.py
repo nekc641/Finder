@@ -7,33 +7,39 @@ import aiohttp
 from config import get_webhooks
 from datetime import datetime
 import pytz
+import requests
 
-ROBLOX_LOGO = "https://tr.rbxcdn.com/92e3e98bb45cf05b1363e99df53e23f6/150/150/Image/Png"
-PH_TZ = pytz.timezone("Asia/Manila")
-
+THUMBNAIL_URL = "https://cdn.discordapp.com/icons/286847620540145664/a_7c34b5d00a26c1ad22b392dfbe6b77a6.gif"
 scan_count = 0
 hit_count = 0
 owned_count = 0
 locked_count = 0
 seen_ids = set()
 
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
+
+def send_telegram_message(text):
+    if TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID:
+        try:
+            requests.post(
+                f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage",
+                data={"chat_id": TELEGRAM_CHAT_ID, "text": text, "parse_mode": "Markdown"}
+            )
+        except Exception as e:
+            print(f"{Fore.RED}Telegram error: {e}{Style.RESET_ALL}")
+
 async def groupfinder():
     global scan_count, hit_count, owned_count, locked_count, seen_ids
     webhooks = get_webhooks()
-
-    # Ask for summary webhook if not present
-    summary = os.getenv("WEBHOOK_SUMMARY")
-    if not summary:
-        summary = input("Enter SUMMARY webhook: ")
-    webhooks["summary"] = summary
 
     async with aiohttp.ClientSession() as session:
         while True:
             group_id = random.choice([
                 random.randint(1000000, 5000000),
-                random.randint(5000001, 99999999)
+                random.randint(5000001, 20000000),
+                random.randint(20000001, 99999999)
             ])
-
             if group_id in seen_ids:
                 print(f"{Fore.CYAN}[=] Duplicate group ID skipped: {group_id}{Style.RESET_ALL}")
                 await asyncio.sleep(0.1)
@@ -66,12 +72,13 @@ async def groupfinder():
                     creation_date = "Unknown"
                     if creation:
                         try:
-                            dt = datetime.fromisoformat(creation.replace("Z", "+00:00"))
-                            creation_date = dt.astimezone(PH_TZ).strftime("%B %d, %Y %I:%M %p")
+                            creation_dt = datetime.fromisoformat(creation.replace("Z", "+00:00"))
+                            manila_tz = pytz.timezone("Asia/Manila")
+                            creation_date = creation_dt.astimezone(manila_tz).strftime("%B %d, %Y")
                         except Exception:
                             pass
 
-                    avatar_url = f"https://www.roblox.com/headshot-thumbnail/image?userId={owner_id}&width=150&height=150&format=png" if owner_id else ROBLOX_LOGO
+                    avatar_url = f"https://www.roblox.com/headshot-thumbnail/image?userId={owner_id}&width=150&height=150&format=png" if owner_id else None
 
                     # UNCLAIMED BUT NOT JOINABLE (Locked)
                     if owner_data is None and not data.get('publicEntryAllowed'):
@@ -81,7 +88,7 @@ async def groupfinder():
                             description=f"[View Group]({group_url})\n{description}",
                             color=0x8e44ad
                         )
-                        embed.set_image(url=ROBLOX_LOGO)
+                        embed.set_image(url=THUMBNAIL_URL)
                         embed.add_field(name="Group ID", value=str(group_id), inline=True)
                         embed.add_field(name="Members", value=str(members), inline=True)
                         embed.add_field(name="Created", value=creation_date, inline=True)
@@ -103,7 +110,7 @@ async def groupfinder():
                             color=0xf1c40f
                         )
                         if avatar_url:
-                            embed.set_thumbnail(url=avatar_url)
+                            embed.set_author(name=owner_username, icon_url=avatar_url)
                         embed.add_field(name="Group ID", value=str(group_id), inline=True)
                         embed.add_field(name="Owner", value=owner_username, inline=True)
                         embed.add_field(name="Members", value=str(members), inline=True)
@@ -124,7 +131,7 @@ async def groupfinder():
                         description=f"[Claim This Group Now!]({group_url})\n{description}",
                         color=0x2ecc71
                     )
-                    embed.set_thumbnail(url=ROBLOX_LOGO)
+                    embed.set_image(url=THUMBNAIL_URL)
                     embed.add_field(name="Group ID", value=str(group_id), inline=True)
                     embed.add_field(name="Members", value=str(members), inline=True)
                     embed.add_field(name="Created", value=creation_date, inline=True)
@@ -135,18 +142,14 @@ async def groupfinder():
                     await webhook.send(content="@here", embed=embed)
                     hit_count += 1
 
-                    # Send summary every 5 scans
+                    # Send summary every 5 scans to Telegram
                     if scan_count % 5 == 0:
-                        summary = Embed(
-                            title="Group Finder Summary",
-                            description=f"**Total Scans:** {scan_count}\n**Hits:** {hit_count}\n**Locked:** {locked_count}\n**Owned:** {owned_count}",
-                            color=0x95a5a6
+                        summary_text = (
+                            f"📊 *Group Finder Summary*\n"
+                            f"Scans: {scan_count}\nHits: {hit_count}\nLocked: {locked_count}\nOwned: {owned_count}\n"
+                            f"Time: {datetime.now(pytz.timezone('Asia/Manila')).strftime('%H:%M:%S')}"
                         )
-                        scan_speed = f"~{elapsed.total_seconds():.2f} sec/scan"
-                        summary.set_thumbnail(url=ROBLOX_LOGO)
-                        summary.set_footer(text=f"Speed: {scan_speed} • {datetime.now(PH_TZ).strftime('%B %d, %Y %I:%M:%S %p')}")
-                        stats_webhook = Webhook.from_url(webhooks["summary"], session=session)
-                        await stats_webhook.send(embed=summary)
+                        send_telegram_message(summary_text)
 
             except asyncio.TimeoutError:
                 print(f"{Fore.RED}Timeout while checking group {group_id}{Style.RESET_ALL}")
