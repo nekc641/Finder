@@ -8,7 +8,7 @@ from datetime import datetime
 
 THUMBNAIL_URL = "https://cdn.discordapp.com/attachments/1394012837575131138/1394108844971393055/Untitled6_20250601183907.png"
 AUTHOR_ICON = "https://cdn.discordapp.com/attachments/1394012837575131138/1394109975277600818/Noah_windbreaker.jpg"
-AUTHOR_NAME = "**Rekon**"
+AUTHOR_NAME = "Rekon"
 
 scan_count = 0
 
@@ -46,16 +46,16 @@ async def groupfinder():
                         except Exception:
                             pass
 
-                    # 🔒 LOCKED
-                    if data.get('isLocked'):
-                        print(f"{Fore.RED}[-] Group Locked: {group_id}{Style.RESET_ALL}")
+                    # 🔒 UNCLAIMED BUT NOT JOINABLE (Locked)
+                    if data.get('owner') is None and not data.get('publicEntryAllowed'):
+                        print(f"{Fore.MAGENTA}[!] Unclaimed but No Public Entry: {group_id}{Style.RESET_ALL}")
                         embed = Embed(
                             title=f"🔒 Locked Group - {name}",
                             description=f"[View Group]({group_url})\n{description}",
                             color=0x8e44ad
                         )
                         embed.set_author(name=AUTHOR_NAME, icon_url=AUTHOR_ICON)
-                        embed.set_thumbnail(url=THUMBNAIL_URL)
+                        embed.set_image(url=THUMBNAIL_URL)
                         embed.add_field(name="🔗 Group ID", value=str(group_id), inline=True)
                         embed.add_field(name="👥 Members", value=str(members), inline=True)
                         embed.add_field(name="📆 Created", value=creation_date, inline=True)
@@ -76,7 +76,7 @@ async def groupfinder():
                             color=0xf1c40f
                         )
                         embed.set_author(name=AUTHOR_NAME, icon_url=AUTHOR_ICON)
-                        embed.set_thumbnail(url=THUMBNAIL_URL)
+                        embed.set_image(url=THUMBNAIL_URL)
                         embed.add_field(name="🔗 Group ID", value=str(group_id), inline=True)
                         embed.add_field(name="👥 Members", value=str(members), inline=True)
                         embed.add_field(name="📆 Created", value=creation_date, inline=True)
@@ -96,7 +96,7 @@ async def groupfinder():
                         color=0x2ecc71
                     )
                     embed.set_author(name=AUTHOR_NAME, icon_url=AUTHOR_ICON)
-                    embed.set_thumbnail(url=THUMBNAIL_URL)
+                    embed.set_image(url=THUMBNAIL_URL)
                     embed.add_field(name="🔗 Group ID", value=str(group_id), inline=True)
                     embed.add_field(name="👥 Members", value=str(members), inline=True)
                     embed.add_field(name="📆 Created", value=creation_date, inline=True)
