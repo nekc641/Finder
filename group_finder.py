@@ -8,19 +8,20 @@ from config import get_webhooks
 from datetime import datetime
 import pytz
 
-seen_ids = set()
+ROBLOX_LOGO = "https://tr.rbxcdn.com/92e3e98bb45cf05b1363e99df53e23f6/150/150/Image/Png"
+PH_TZ = pytz.timezone("Asia/Manila")
+
 scan_count = 0
 hit_count = 0
 owned_count = 0
 locked_count = 0
-
-PH_TZ = pytz.timezone("Asia/Manila")
-ROBLOX_LOGO = "https://upload.wikimedia.org/wikipedia/commons/6/69/Roblox_Logo_2022.svg"
+seen_ids = set()
 
 async def groupfinder():
     global scan_count, hit_count, owned_count, locked_count, seen_ids
     webhooks = get_webhooks()
 
+    # Ask for summary webhook if not present
     summary = os.getenv("WEBHOOK_SUMMARY")
     if not summary:
         summary = input("Enter SUMMARY webhook: ")
@@ -30,8 +31,7 @@ async def groupfinder():
         while True:
             group_id = random.choice([
                 random.randint(1000000, 5000000),
-                random.randint(5000001, 10000000),
-                random.randint(10000001, 99999999)
+                random.randint(5000001, 99999999)
             ])
 
             if group_id in seen_ids:
@@ -67,13 +67,13 @@ async def groupfinder():
                     if creation:
                         try:
                             dt = datetime.fromisoformat(creation.replace("Z", "+00:00"))
-                            creation_date = dt.astimezone(PH_TZ).strftime("%B %d, %Y")
+                            creation_date = dt.astimezone(PH_TZ).strftime("%B %d, %Y %I:%M %p")
                         except Exception:
                             pass
 
                     avatar_url = f"https://www.roblox.com/headshot-thumbnail/image?userId={owner_id}&width=150&height=150&format=png" if owner_id else ROBLOX_LOGO
 
-                    # LOCKED
+                    # UNCLAIMED BUT NOT JOINABLE (Locked)
                     if owner_data is None and not data.get('publicEntryAllowed'):
                         print(f"{Fore.MAGENTA}[!] Unclaimed but No Public Entry: {group_id}{Style.RESET_ALL}")
                         embed = Embed(
@@ -102,7 +102,8 @@ async def groupfinder():
                             description=f"[View Group]({group_url})\n{description}",
                             color=0xf1c40f
                         )
-                        embed.set_thumbnail(url=avatar_url)
+                        if avatar_url:
+                            embed.set_thumbnail(url=avatar_url)
                         embed.add_field(name="Group ID", value=str(group_id), inline=True)
                         embed.add_field(name="Owner", value=owner_username, inline=True)
                         embed.add_field(name="Members", value=str(members), inline=True)
@@ -116,7 +117,7 @@ async def groupfinder():
                         await asyncio.sleep(random.uniform(2.0, 3.2))
                         continue
 
-                    # HIT
+                    # HIT (Unclaimed and Joinable)
                     print(f"{Fore.GREEN}[+] HIT: Unclaimed Group ID {group_id}{Style.RESET_ALL}")
                     embed = Embed(
                         title=f"HIT: {name}",
@@ -134,18 +135,18 @@ async def groupfinder():
                     await webhook.send(content="@here", embed=embed)
                     hit_count += 1
 
-                
+                    # Send summary every 5 scans
                     if scan_count % 5 == 0:
                         summary = Embed(
                             title="Group Finder Summary",
-                            description=f"Total Scans: {scan_count}\nHits: {hit_count}\nLocked: {locked_count}\nOwned: {owned_count}",
-                            color=0x7289DA
+                            description=f"**Total Scans:** {scan_count}\n**Hits:** {hit_count}\n**Locked:** {locked_count}\n**Owned:** {owned_count}",
+                            color=0x95a5a6
                         )
-                        now = datetime.now(PH_TZ)
+                        scan_speed = f"~{elapsed.total_seconds():.2f} sec/scan"
                         summary.set_thumbnail(url=ROBLOX_LOGO)
-                        summary.set_footer(text=f"Updated • {now.strftime('%b %d, %Y %I:%M:%S %p')} PH Time")
-                        webhook = Webhook.from_url(webhooks["summary"], session=session)
-                        await webhook.send(embed=summary)
+                        summary.set_footer(text=f"Speed: {scan_speed} • {datetime.now(PH_TZ).strftime('%B %d, %Y %I:%M:%S %p')}")
+                        stats_webhook = Webhook.from_url(webhooks["summary"], session=session)
+                        await stats_webhook.send(embed=summary)
 
             except asyncio.TimeoutError:
                 print(f"{Fore.RED}Timeout while checking group {group_id}{Style.RESET_ALL}")
