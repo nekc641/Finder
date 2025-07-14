@@ -11,14 +11,30 @@ AUTHOR_ICON = "https://cdn.discordapp.com/attachments/1394012837575131138/139410
 AUTHOR_NAME = "Rekon"
 
 scan_count = 0
+hit_count = 0
+owned_count = 0
+locked_count = 0
+seen_ids = set()
 
 async def groupfinder():
-    global scan_count
+    global scan_count, hit_count, owned_count, locked_count, seen_ids
     webhooks = get_webhooks()
+
+    # Ask for summary webhook if not present
+    summary = os.getenv("WEBHOOK_SUMMARY")
+    if not summary:
+        summary = input("Enter SUMMARY webhook: ")
+    webhooks["summary"] = summary
 
     async with aiohttp.ClientSession() as session:
         while True:
-            group_id = random.randint(1000000, 99999999)
+            group_id = random.randint(1000000, 5555555, 99999999)
+            if group_id in seen_ids:
+                print(f"{Fore.CYAN}[=] Duplicate group ID skipped: {group_id}{Style.RESET_ALL}")
+                await asyncio.sleep(0.1)
+                continue
+            seen_ids.add(group_id)
+
             scan_count += 1
             start_time = datetime.now()
 
@@ -35,6 +51,9 @@ async def groupfinder():
                     description = data.get("description", "No description provided.")
                     members = data.get("memberCount", 0)
                     creation = data.get("created")
+                    owner_data = data.get("owner")
+                    owner_username = owner_data.get("username") if owner_data else "None"
+                    owner_id = owner_data.get("userId") if owner_data else None
 
                     if len(description) > 200:
                         description = description[:200] + "..."
@@ -46,65 +65,82 @@ async def groupfinder():
                         except Exception:
                             pass
 
-                    # 🔒 UNCLAIMED BUT NOT JOINABLE (Locked)
-                    if data.get('owner') is None and not data.get('publicEntryAllowed'):
+                    avatar_url = f"https://www.roblox.com/headshot-thumbnail/image?userId={owner_id}&width=150&height=150&format=png" if owner_id else None
+
+                    # UNCLAIMED BUT NOT JOINABLE (Locked)
+                    if owner_data is None and not data.get('publicEntryAllowed'):
                         print(f"{Fore.MAGENTA}[!] Unclaimed but No Public Entry: {group_id}{Style.RESET_ALL}")
                         embed = Embed(
-                            title=f"🔒 Locked Group - {name}",
+                            title=f"Locked Group - {name}",
                             description=f"[View Group]({group_url})\n{description}",
                             color=0x8e44ad
                         )
                         embed.set_author(name=AUTHOR_NAME, icon_url=AUTHOR_ICON)
                         embed.set_image(url=THUMBNAIL_URL)
-                        embed.add_field(name="🔗 Group ID", value=str(group_id), inline=True)
-                        embed.add_field(name="👥 Members", value=str(members), inline=True)
-                        embed.add_field(name="📆 Created", value=creation_date, inline=True)
-                        embed.add_field(name="📶 Status", value="🔐 Locked", inline=True)
+                        embed.add_field(name="Group ID", value=str(group_id), inline=True)
+                        embed.add_field(name="Members", value=str(members), inline=True)
+                        embed.add_field(name="Created", value=creation_date, inline=True)
+                        embed.add_field(name="Status", value="Locked", inline=True)
                         elapsed = datetime.now() - start_time
                         embed.set_footer(text=f"Scan #{scan_count} • Took {elapsed.total_seconds():.2f}s")
                         webhook = Webhook.from_url(webhooks["locked"], session=session)
                         await webhook.send(embed=embed)
+                        locked_count += 1
                         await asyncio.sleep(random.uniform(2.0, 3.2))
                         continue
 
-                    # 👑 OWNED
-                    if data.get('owner') is not None:
+                    # OWNED
+                    if owner_data is not None:
                         print(f"{Fore.YELLOW}[-] Group Owned: {group_id}{Style.RESET_ALL}")
                         embed = Embed(
-                            title=f"👑 Owned Group - {name}",
+                            title=f"Owned Group - {name}",
                             description=f"[View Group]({group_url})\n{description}",
                             color=0xf1c40f
                         )
                         embed.set_author(name=AUTHOR_NAME, icon_url=AUTHOR_ICON)
-                        embed.set_image(url=THUMBNAIL_URL)
-                        embed.add_field(name="🔗 Group ID", value=str(group_id), inline=True)
-                        embed.add_field(name="👥 Members", value=str(members), inline=True)
-                        embed.add_field(name="📆 Created", value=creation_date, inline=True)
-                        embed.add_field(name="📶 Status", value="❌ Claimed", inline=True)
+                        embed.set_image(url=avatar_url if avatar_url else THUMBNAIL_URL)
+                        embed.add_field(name="Group ID", value=str(group_id), inline=True)
+                        embed.add_field(name="Owner", value=owner_username, inline=True)
+                        embed.add_field(name="Members", value=str(members), inline=True)
+                        embed.add_field(name="Created", value=creation_date, inline=True)
+                        embed.add_field(name="Status", value="Claimed", inline=True)
                         elapsed = datetime.now() - start_time
                         embed.set_footer(text=f"Scan #{scan_count} • Took {elapsed.total_seconds():.2f}s")
                         webhook = Webhook.from_url(webhooks["owned"], session=session)
                         await webhook.send(embed=embed)
+                        owned_count += 1
                         await asyncio.sleep(random.uniform(2.0, 3.2))
                         continue
 
-                    # ✅ HIT (Unclaimed and Joinable)
+                    # HIT (Unclaimed and Joinable)
                     print(f"{Fore.GREEN}[+] HIT: Unclaimed Group ID {group_id}{Style.RESET_ALL}")
                     embed = Embed(
-                        title=f"🎯 HIT: {name}",
+                        title=f"HIT: {name}",
                         description=f"[Claim This Group Now!]({group_url})\n{description}",
                         color=0x2ecc71
                     )
                     embed.set_author(name=AUTHOR_NAME, icon_url=AUTHOR_ICON)
                     embed.set_image(url=THUMBNAIL_URL)
-                    embed.add_field(name="🔗 Group ID", value=str(group_id), inline=True)
-                    embed.add_field(name="👥 Members", value=str(members), inline=True)
-                    embed.add_field(name="📆 Created", value=creation_date, inline=True)
-                    embed.add_field(name="📶 Status", value="✅ Joinable", inline=True)
+                    embed.add_field(name="Group ID", value=str(group_id), inline=True)
+                    embed.add_field(name="Members", value=str(members), inline=True)
+                    embed.add_field(name="Created", value=creation_date, inline=True)
+                    embed.add_field(name="Status", value="Joinable", inline=True)
                     elapsed = datetime.now() - start_time
                     embed.set_footer(text=f"Scan #{scan_count} • Took {elapsed.total_seconds():.2f}s")
                     webhook = Webhook.from_url(webhooks["hit"], session=session)
                     await webhook.send(content="@here", embed=embed)
+                    hit_count += 1
+
+                    # Send summary every 100 scans
+                    if scan_count % 100 == 0:
+                        summary = Embed(
+                            title="Group Finder Summary",
+                            description=f"Total Scans: {scan_count}\nHits: {hit_count}\nLocked: {locked_count}\nOwned: {owned_count}",
+                            color=0x95a5a6
+                        )
+                        summary.set_footer(text=f"Last 100 scan summary at {datetime.utcnow().strftime('%H:%M:%S UTC')}")
+                        stats_webhook = Webhook.from_url(webhooks["summary"], session=session)
+                        await stats_webhook.send(embed=summary)
 
             except asyncio.TimeoutError:
                 print(f"{Fore.RED}Timeout while checking group {group_id}{Style.RESET_ALL}")
