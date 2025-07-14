@@ -7,8 +7,9 @@ import aiohttp
 from config import get_webhooks
 from datetime import datetime
 import pytz
+from telegram import send_telegram_summary
 
-import requests  # for Telegram summary
+THUMBNAIL_URL = "https://www.roblox.com/Thumbs/Avatar.ashx?x=100&y=100&format=png&userid=1"
 
 scan_count = 0
 hit_count = 0
@@ -20,15 +21,12 @@ async def groupfinder():
     global scan_count, hit_count, owned_count, locked_count, seen_ids
     webhooks = get_webhooks()
 
-    telegram_token = os.getenv("TELEGRAM_BOT_TOKEN")
-    telegram_chat_id = os.getenv("TELEGRAM_CHAT_ID")
-
     async with aiohttp.ClientSession() as session:
         while True:
             group_id = random.choice([
-                random.randint(1000000, 4999999),
-                random.randint(10000000, 49999999),
-                random.randint(50000000, 99999999)
+                random.randint(1000000, 5000000),
+                random.randint(5000001, 10000000),
+                random.randint(10000001, 99999999)
             ])
 
             if group_id in seen_ids:
@@ -64,8 +62,8 @@ async def groupfinder():
                     if creation:
                         try:
                             tz = pytz.timezone("Asia/Manila")
-                            dt = datetime.fromisoformat(creation.replace("Z", "+00:00"))
-                            creation_date = dt.astimezone(tz).strftime("%B %d, %Y")
+                            dt = datetime.fromisoformat(creation.replace("Z", "+00:00")).astimezone(tz)
+                            creation_date = dt.strftime("%B %d, %Y")
                         except Exception:
                             pass
 
@@ -79,7 +77,7 @@ async def groupfinder():
                             description=f"[View Group]({group_url})\n{description}",
                             color=0x8e44ad
                         )
-                        embed.set_image(url=avatar_url if avatar_url else "https://tr.rbxcdn.com/8e7b683a42012f04115b356e2db2dc0d/150/150/Image/Png")
+                        embed.set_image(url=THUMBNAIL_URL)
                         embed.add_field(name="Group ID", value=str(group_id), inline=True)
                         embed.add_field(name="Members", value=str(members), inline=True)
                         embed.add_field(name="Created", value=creation_date, inline=True)
@@ -122,7 +120,7 @@ async def groupfinder():
                         description=f"[Claim This Group Now!]({group_url})\n{description}",
                         color=0x2ecc71
                     )
-                    embed.set_image(url="https://tr.rbxcdn.com/8e7b683a42012f04115b356e2db2dc0d/150/150/Image/Png")
+                    embed.set_image(url="https://www.roblox.com/outfit-thumbnail/image?userOutfitId=1&width=420&height=420&format=png")
                     embed.add_field(name="Group ID", value=str(group_id), inline=True)
                     embed.add_field(name="Members", value=str(members), inline=True)
                     embed.add_field(name="Created", value=creation_date, inline=True)
@@ -133,24 +131,16 @@ async def groupfinder():
                     await webhook.send(content="@here", embed=embed)
                     hit_count += 1
 
-                    # Telegram summary every 5 scans
-                    if telegram_token and telegram_chat_id and scan_count % 5 == 0:
-                        summary = (
+                    # Telegram Summary
+                    if scan_count % 5 == 0:
+                        summary_msg = (
                             f"📊 *Group Finder Summary*\n"
-                            f"Total Scans: {scan_count}\n"
-                            f"Hits: {hit_count}\n"
-                            f"Locked: {locked_count}\n"
-                            f"Owned: {owned_count}\n"
-                            f"Scan Speed: {elapsed.total_seconds():.2f}s"
+                            f"Scans: `{scan_count}`\n"
+                            f"Hits: `{hit_count}`\n"
+                            f"Owned: `{owned_count}`\n"
+                            f"Locked: `{locked_count}`"
                         )
-                        requests.post(
-                            f"https://api.telegram.org/bot{telegram_token}/sendMessage",
-                            data={
-                                "chat_id": telegram_chat_id,
-                                "text": summary,
-                                "parse_mode": "Markdown"
-                            }
-                        )
+                        await send_telegram_summary(summary_msg)
 
             except asyncio.TimeoutError:
                 print(f"{Fore.RED}Timeout while checking group {group_id}{Style.RESET_ALL}")
