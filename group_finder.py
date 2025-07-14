@@ -7,8 +7,6 @@ from config import get_webhooks
 from datetime import datetime
 
 THUMBNAIL_URL = "https://cdn.discordapp.com/attachments/1394012837575131138/1394108844971393055/Untitled6_20250601183907.png"
-AUTHOR_ICON = "https://cdn.discordapp.com/attachments/1394012837575131138/1394109975277600818/Noah_windbreaker.jpg"
-AUTHOR_NAME = "Rekon"
 
 scan_count = 0
 hit_count = 0
@@ -28,7 +26,7 @@ async def groupfinder():
 
     async with aiohttp.ClientSession() as session:
         while True:
-            group_id = random.randint(1000000, 5555555, 99999999)
+            group_id = random.randint(1000000, 99999999)
             if group_id in seen_ids:
                 print(f"{Fore.CYAN}[=] Duplicate group ID skipped: {group_id}{Style.RESET_ALL}")
                 await asyncio.sleep(0.1)
@@ -75,7 +73,6 @@ async def groupfinder():
                             description=f"[View Group]({group_url})\n{description}",
                             color=0x8e44ad
                         )
-                        embed.set_author(name=AUTHOR_NAME, icon_url=AUTHOR_ICON)
                         embed.set_image(url=THUMBNAIL_URL)
                         embed.add_field(name="Group ID", value=str(group_id), inline=True)
                         embed.add_field(name="Members", value=str(members), inline=True)
@@ -97,7 +94,6 @@ async def groupfinder():
                             description=f"[View Group]({group_url})\n{description}",
                             color=0xf1c40f
                         )
-                        embed.set_author(name=AUTHOR_NAME, icon_url=AUTHOR_ICON)
                         embed.set_image(url=avatar_url if avatar_url else THUMBNAIL_URL)
                         embed.add_field(name="Group ID", value=str(group_id), inline=True)
                         embed.add_field(name="Owner", value=owner_username, inline=True)
@@ -119,7 +115,6 @@ async def groupfinder():
                         description=f"[Claim This Group Now!]({group_url})\n{description}",
                         color=0x2ecc71
                     )
-                    embed.set_author(name=AUTHOR_NAME, icon_url=AUTHOR_ICON)
                     embed.set_image(url=THUMBNAIL_URL)
                     embed.add_field(name="Group ID", value=str(group_id), inline=True)
                     embed.add_field(name="Members", value=str(members), inline=True)
